@@ -10,8 +10,8 @@ use pocketmine\player\Player;
 
 class Main extends PluginBase implements Listener{
 
+    private array $stats = [];
     private LeaderboardManager $manager;
-    private array $stats;
 
     public function onEnable(): void{
 
@@ -25,20 +25,20 @@ class Main extends PluginBase implements Listener{
 
         $this->getServer()->getPluginManager()->registerEvents($this,$this);
 
+        $this->getServer()->getCommandMap()->register("lb",
+            new LBCommand($this)
+        );
+
         $this->getScheduler()->scheduleRepeatingTask(
             new LeaderboardTask($this->manager),
             $this->getConfig()->get("update-time") * 20
         );
 
-        $this->getServer()->getCommandMap()->register("lb",
-            new Command\LBCommand($this)
-        );
-
         $this->manager->loadBoards();
     }
 
-    public function getStats(): array{
-        return $this->stats;
+    public function getManager(): LeaderboardManager{
+        return $this->manager;
     }
 
     public function addStat(string $player,string $type): void{
@@ -56,12 +56,12 @@ class Main extends PluginBase implements Listener{
         $this->stats["players"][$player][$type]++;
     }
 
-    public function saveStats(): void{
-        yaml_emit_file($this->getDataFolder()."stats.yml",$this->stats);
+    public function getStats(): array{
+        return $this->stats;
     }
 
-    public function getManager(): LeaderboardManager{
-        return $this->manager;
+    public function saveStats(): void{
+        yaml_emit_file($this->getDataFolder()."stats.yml",$this->stats);
     }
 
     public function onDeath(PlayerDeathEvent $event): void{
