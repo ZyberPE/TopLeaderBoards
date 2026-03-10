@@ -74,7 +74,6 @@ class LeaderboardManager{
             $values = [];
 
             foreach($stats as $player => $data){
-
                 $values[$player] = $data[$type] ?? 0;
             }
 
@@ -87,16 +86,13 @@ class LeaderboardManager{
             $rank = 1;
 
             foreach($top as $player=>$value){
-
                 $text .= "§e#$rank §f$player §7- §a$value\n";
-
                 $rank++;
             }
 
             foreach($pos->getWorld()->getPlayers() as $player){
 
                 if($player->getPosition()->distance($pos) <= 15){
-
                     $player->sendPopup($text);
                 }
             }
