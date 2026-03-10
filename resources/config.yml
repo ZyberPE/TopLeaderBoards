@@ -1,16 +1,11 @@
 update-time: 60
 
-title-format: "§l§6{name}"
-line-format: "§e#{rank} §f{player} §7- §a{value}"
+formats:
+  title: "§l§6{name}"
+  line: "§e#{rank} §f{player} §7- §a{value}"
 
 leaderboards:
   TopKills: kills
   TopDeaths: deaths
   TopMined: mined
   TopMoney: money
-
-messages:
-  created: "§aLeaderboard {name} created."
-  removed: "§cLeaderboard {name} removed."
-  exists: "§cLeaderboard already exists."
-  notfound: "§cLeaderboard not found."
