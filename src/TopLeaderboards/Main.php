@@ -25,6 +25,8 @@ class Main extends PluginBase implements Listener{
 
         $this->getServer()->getPluginManager()->registerEvents($this,$this);
 
+        $this->getCommand("lb")->setExecutor(new LBCommand($this));
+        
         $this->getServer()->getCommandMap()->register("lb",
             new LBCommand($this)
         );
