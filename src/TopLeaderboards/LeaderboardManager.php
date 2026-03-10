@@ -2,8 +2,8 @@
 
 namespace TopLeaderboards;
 
-use pocketmine\player\Player;
 use pocketmine\world\Position;
+use pocketmine\world\World;
 
 class LeaderboardManager{
 
@@ -14,53 +14,92 @@ class LeaderboardManager{
         $this->plugin = $plugin;
     }
 
-    public function spawnBoard(string $name, Position $pos): void{
+    public function loadBoards(): void{
+
+        $data = yaml_parse_file($this->plugin->getDataFolder()."leaderboards.yml");
+
+        foreach($data["boards"] ?? [] as $name => $pos){
+
+            $world = $this->plugin->getServer()->getWorldManager()->getWorldByName($pos["world"]);
+
+            if($world instanceof World){
+
+                $this->boards[$name] = new Position(
+                    $pos["x"],
+                    $pos["y"],
+                    $pos["z"],
+                    $world
+                );
+            }
+        }
+    }
+
+    public function spawn(string $name, Position $pos): void{
+
         $this->boards[$name] = $pos;
+
+        $data = yaml_parse_file($this->plugin->getDataFolder()."leaderboards.yml");
+
+        $data["boards"][$name] = [
+            "x"=>$pos->getX(),
+            "y"=>$pos->getY(),
+            "z"=>$pos->getZ(),
+            "world"=>$pos->getWorld()->getFolderName()
+        ];
+
+        yaml_emit_file($this->plugin->getDataFolder()."leaderboards.yml",$data);
     }
 
-    public function removeBoard(string $name): void{
+    public function remove(string $name): void{
+
         unset($this->boards[$name]);
-    }
 
-    public function getBoards(): array{
-        return $this->boards;
+        $data = yaml_parse_file($this->plugin->getDataFolder()."leaderboards.yml");
+
+        unset($data["boards"][$name]);
+
+        yaml_emit_file($this->plugin->getDataFolder()."leaderboards.yml",$data);
     }
 
     public function update(): void{
+
         foreach($this->boards as $name => $pos){
-            $this->updateBoard($name,$pos);
-        }
-    }
 
-    private function updateBoard(string $name, Position $pos): void{
+            $type = $this->plugin->getConfig()->get("leaderboards")[$name] ?? null;
 
-        $config = $this->plugin->getConfig()->get("leaderboards");
-        if(!isset($config[$name])) return;
+            if($type === null) continue;
 
-        $type = $config[$name]["type"];
+            $stats = $this->plugin->getStats()["players"] ?? [];
 
-        $stats = $this->plugin->getStats()["players"] ?? [];
+            $values = [];
 
-        $values = [];
+            foreach($stats as $player => $data){
 
-        foreach($stats as $player => $data){
-            $values[$player] = $data[$type] ?? 0;
-        }
+                $values[$player] = $data[$type] ?? 0;
+            }
 
-        arsort($values);
+            arsort($values);
 
-        $top = array_slice($values,0,10,true);
+            $top = array_slice($values,0,10,true);
 
-        $text = "§6$name\n";
+            $text = "§6$name\n";
 
-        $rank = 1;
-        foreach($top as $player => $value){
-            $text .= "§e#$rank §f$player §7- §a$value\n";
-            $rank++;
-        }
+            $rank = 1;
 
-        foreach($pos->getWorld()->getPlayers() as $p){
-            $p->sendPopup($text);
+            foreach($top as $player=>$value){
+
+                $text .= "§e#$rank §f$player §7- §a$value\n";
+
+                $rank++;
+            }
+
+            foreach($pos->getWorld()->getPlayers() as $player){
+
+                if($player->getPosition()->distance($pos) <= 15){
+
+                    $player->sendPopup($text);
+                }
+            }
         }
     }
 }
