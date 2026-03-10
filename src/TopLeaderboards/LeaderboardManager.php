@@ -2,124 +2,65 @@
 
 namespace TopLeaderboards;
 
-use pocketmine\scheduler\Task;
 use pocketmine\player\Player;
 use pocketmine\world\Position;
-use pocketmine\entity\Location;
-use onebone\economyapi\EconomyAPI;
 
-class LeaderboardManager extends Task{
+class LeaderboardManager{
 
     private Main $plugin;
-    private array $holograms = [];
+    private array $boards = [];
 
     public function __construct(Main $plugin){
         $this->plugin = $plugin;
     }
 
-    public function spawnLeaderboard(Player $player,string $name){
-
-        $cfg = $this->plugin->getConfig()->get("leaderboards");
-
-        if(!isset($cfg[$name])){
-            $player->sendMessage($this->plugin->getConfig()->get("messages")["not-found"]);
-            return;
-        }
-
-        $pos = $player->getPosition();
-
-        $text = $this->buildText($name);
-
-        $entity = new FloatingText(
-            Location::fromObject($pos,$player->getWorld()),
-            $text
-        );
-
-        $entity->spawnToAll();
-
-        $this->holograms[$name] = $entity;
-
-        $player->sendMessage(str_replace("{name}",$name,$this->plugin->getConfig()->get("messages")["spawned"]));
+    public function spawnBoard(string $name, Position $pos): void{
+        $this->boards[$name] = $pos;
     }
 
-    public function removeLeaderboard(string $name){
+    public function removeBoard(string $name): void{
+        unset($this->boards[$name]);
+    }
 
-        if(isset($this->holograms[$name])){
-            $this->holograms[$name]->flagForDespawn();
-            unset($this->holograms[$name]);
+    public function getBoards(): array{
+        return $this->boards;
+    }
+
+    public function update(): void{
+        foreach($this->boards as $name => $pos){
+            $this->updateBoard($name,$pos);
         }
     }
 
-    public function onRun(): void{
+    private function updateBoard(string $name, Position $pos): void{
 
-        foreach($this->holograms as $name=>$entity){
+        $config = $this->plugin->getConfig()->get("leaderboards");
+        if(!isset($config[$name])) return;
 
-            $entity->setText($this->buildText($name));
-        }
-    }
+        $type = $config[$name]["type"];
 
-    private function buildText(string $name): string{
+        $stats = $this->plugin->getStats()["players"] ?? [];
 
-        $cfg = $this->plugin->getConfig()->get("leaderboards")[$name];
+        $values = [];
 
-        $title = $cfg["title"];
-        $lines = $cfg["lines"];
-        $format = $cfg["format"];
-        $type = $cfg["type"];
-
-        $data = $this->getData($type);
-
-        arsort($data);
-
-        $text = $title."\n";
-
-        $i = 1;
-
-        foreach($data as $player=>$value){
-
-            $text .= str_replace(
-                ["{rank}","{player}","{value}"],
-                [$i,$player,$value],
-                $format
-            )."\n";
-
-            if($i++ >= $lines) break;
+        foreach($stats as $player => $data){
+            $values[$player] = $data[$type] ?? 0;
         }
 
-        return $text;
-    }
+        arsort($values);
 
-    private function getData(string $type): array{
+        $top = array_slice($values,0,10,true);
 
-        $data = [];
+        $text = "§6$name\n";
 
-        foreach($this->plugin->getServer()->getOfflinePlayers() as $player){
-
-            switch($type){
-
-                case "kills":
-                    $data[$player->getName()] = $player->getPlayer()?->getKills() ?? 0;
-                break;
-
-                case "deaths":
-                    $data[$player->getName()] = $player->getPlayer()?->getDeaths() ?? 0;
-                break;
-
-                case "money":
-
-                    if(class_exists(EconomyAPI::class)){
-                        $data[$player->getName()] = EconomyAPI::getInstance()->myMoney($player->getName());
-                    }else{
-                        $data[$player->getName()] = 0;
-                    }
-
-                break;
-
-                default:
-                    $data[$player->getName()] = 0;
-            }
+        $rank = 1;
+        foreach($top as $player => $value){
+            $text .= "§e#$rank §f$player §7- §a$value\n";
+            $rank++;
         }
 
-        return $data;
+        foreach($pos->getWorld()->getPlayers() as $p){
+            $p->sendPopup($text);
+        }
     }
 }
