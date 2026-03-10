@@ -1,6 +1,6 @@
 name: TopLeaderboards
+version: 2.0.0
 main: TopLeaderboards\Main
-version: 1.0.0
 api: 5.0.0
 author: ZyberPE
 
@@ -8,8 +8,8 @@ commands:
   lb:
     description: Leaderboard commands
     usage: "/lb spawn <name> | /lb remove <name> | /lb list"
-    permission: topleaderboards.command
+    permission: topleaderboards.admin
 
 permissions:
-  topleaderboards.command:
+  topleaderboards.admin:
     default: op
