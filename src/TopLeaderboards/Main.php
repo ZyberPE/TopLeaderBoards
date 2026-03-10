@@ -3,67 +3,80 @@
 namespace TopLeaderboards;
 
 use pocketmine\plugin\PluginBase;
-use pocketmine\command\Command;
-use pocketmine\command\CommandSender;
+use pocketmine\event\Listener;
+use pocketmine\event\player\PlayerDeathEvent;
+use pocketmine\event\block\BlockBreakEvent;
 use pocketmine\player\Player;
 
-class Main extends PluginBase{
+class Main extends PluginBase implements Listener{
 
     private LeaderboardManager $manager;
+    private array $stats = [];
 
-    public function onEnable() : void{
-
-        @mkdir($this->getDataFolder());
+    public function onEnable(): void{
         $this->saveDefaultConfig();
+        $this->saveResource("stats.yml");
+
+        $this->stats = yaml_parse_file($this->getDataFolder() . "stats.yml");
 
         $this->manager = new LeaderboardManager($this);
 
+        $this->getServer()->getPluginManager()->registerEvents($this,$this);
+
         $this->getScheduler()->scheduleRepeatingTask(
-            $this->manager,
+            new LeaderboardTask($this->manager),
             $this->getConfig()->get("update-time") * 20
+        );
+
+        $this->getServer()->getCommandMap()->register("lb",
+            new Command\LeaderboardCommand($this)
         );
     }
 
-    public function getManager() : LeaderboardManager{
+    public function getManager(): LeaderboardManager{
         return $this->manager;
     }
 
-    public function onCommand(CommandSender $sender, Command $cmd, string $label, array $args): bool{
+    public function getStats(): array{
+        return $this->stats;
+    }
 
-        if(!$sender instanceof Player){
-            return true;
+    public function saveStats(): void{
+        yaml_emit_file($this->getDataFolder()."stats.yml",$this->stats);
+    }
+
+    private function initPlayer(Player $player): void{
+        $name = strtolower($player->getName());
+        if(!isset($this->stats["players"][$name])){
+            $this->stats["players"][$name] = [
+                "kills" => 0,
+                "deaths" => 0,
+                "mined" => 0
+            ];
         }
+    }
 
-        if(!isset($args[0])){
-            $sender->sendMessage($this->getConfig()->get("messages")["usage"]);
-            return true;
+    public function onDeath(PlayerDeathEvent $event): void{
+        $player = $event->getPlayer();
+        $this->initPlayer($player);
+
+        $this->stats["players"][strtolower($player->getName())]["deaths"]++;
+
+        $killer = $player->getLastDamageCause()?->getEntity();
+        if($killer instanceof Player){
+            $this->initPlayer($killer);
+            $this->stats["players"][strtolower($killer->getName())]["kills"]++;
         }
+    }
 
-        switch($args[0]){
+    public function onBreak(BlockBreakEvent $event): void{
+        $player = $event->getPlayer();
+        $this->initPlayer($player);
 
-            case "spawn":
+        $this->stats["players"][strtolower($player->getName())]["mined"]++;
+    }
 
-                if(!isset($args[1])) return true;
-
-                $this->manager->spawnLeaderboard($sender,$args[1]);
-            break;
-
-            case "remove":
-
-                if(!isset($args[1])) return true;
-
-                $this->manager->removeLeaderboard($args[1]);
-                $sender->sendMessage(str_replace("{name}",$args[1],$this->getConfig()->get("messages")["removed"]));
-            break;
-
-            case "list":
-
-                $list = implode(", ",array_keys($this->getConfig()->get("leaderboards")));
-
-                $sender->sendMessage(str_replace("{list}",$list,$this->getConfig()->get("messages")["list"]));
-            break;
-        }
-
-        return true;
+    public function onDisable(): void{
+        $this->saveStats();
     }
 }
