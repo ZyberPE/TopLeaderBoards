@@ -11,13 +11,15 @@ use pocketmine\player\Player;
 class Main extends PluginBase implements Listener{
 
     private LeaderboardManager $manager;
-    private array $stats = [];
+    private array $stats;
 
     public function onEnable(): void{
+
         $this->saveDefaultConfig();
+        $this->saveResource("leaderboards.yml");
         $this->saveResource("stats.yml");
 
-        $this->stats = yaml_parse_file($this->getDataFolder() . "stats.yml");
+        $this->stats = yaml_parse_file($this->getDataFolder()."stats.yml");
 
         $this->manager = new LeaderboardManager($this);
 
@@ -29,51 +31,54 @@ class Main extends PluginBase implements Listener{
         );
 
         $this->getServer()->getCommandMap()->register("lb",
-            new Command\LeaderboardCommand($this)
+            new Command\LBCommand($this)
         );
-    }
 
-    public function getManager(): LeaderboardManager{
-        return $this->manager;
+        $this->manager->loadBoards();
     }
 
     public function getStats(): array{
         return $this->stats;
     }
 
-    public function saveStats(): void{
-        yaml_emit_file($this->getDataFolder()."stats.yml",$this->stats);
-    }
+    public function addStat(string $player,string $type): void{
 
-    private function initPlayer(Player $player): void{
-        $name = strtolower($player->getName());
-        if(!isset($this->stats["players"][$name])){
-            $this->stats["players"][$name] = [
+        $player = strtolower($player);
+
+        if(!isset($this->stats["players"][$player])){
+            $this->stats["players"][$player] = [
                 "kills" => 0,
                 "deaths" => 0,
                 "mined" => 0
             ];
         }
+
+        $this->stats["players"][$player][$type]++;
+    }
+
+    public function saveStats(): void{
+        yaml_emit_file($this->getDataFolder()."stats.yml",$this->stats);
+    }
+
+    public function getManager(): LeaderboardManager{
+        return $this->manager;
     }
 
     public function onDeath(PlayerDeathEvent $event): void{
-        $player = $event->getPlayer();
-        $this->initPlayer($player);
 
-        $this->stats["players"][strtolower($player->getName())]["deaths"]++;
+        $player = $event->getPlayer();
+
+        $this->addStat($player->getName(),"deaths");
 
         $killer = $player->getLastDamageCause()?->getEntity();
+
         if($killer instanceof Player){
-            $this->initPlayer($killer);
-            $this->stats["players"][strtolower($killer->getName())]["kills"]++;
+            $this->addStat($killer->getName(),"kills");
         }
     }
 
     public function onBreak(BlockBreakEvent $event): void{
-        $player = $event->getPlayer();
-        $this->initPlayer($player);
-
-        $this->stats["players"][strtolower($player->getName())]["mined"]++;
+        $this->addStat($event->getPlayer()->getName(),"mined");
     }
 
     public function onDisable(): void{
